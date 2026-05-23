@@ -3,12 +3,12 @@ import cors from "cors";
 import multer from "multer";
 import Tesseract from "tesseract.js";
 import fs from "fs";
+import os from "os";
+import path from "path";
 
 const app = express();
 
 app.use(cors());
-
-// 🚨 IMPORTANT : augmenter limite pour base64
 app.use(express.json({ limit: "50mb" }));
 
 /**
@@ -29,19 +29,19 @@ app.post("/ocr-text", (req, res) => {
 
 /**
  * =========================
- * 📁 MULTER CONFIG (IMAGE UPLOAD)
+ * 📁 MULTER CONFIG
  * =========================
  */
 const upload = multer({
   dest: "uploads/",
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
 /**
  * =========================
- * 🔥 HEALTH CHECK (Render)
+ * 🔥 HEALTH CHECK
  * =========================
  */
 app.get("/", (req, res) => {
@@ -50,7 +50,7 @@ app.get("/", (req, res) => {
 
 /**
  * =========================
- * 🚀 OCR IMAGE ROUTE (FORMDATA)
+ * 🚀 OCR IMAGE ROUTE
  * =========================
  */
 app.post("/ocr", upload.single("image"), async (req, res) => {
@@ -65,20 +65,16 @@ app.post("/ocr", upload.single("image"), async (req, res) => {
 
     let text = "";
 
-    // 📷 OCR image
     if (imagePath) {
       const result = await Tesseract.recognize(
         imagePath,
         "eng+fra",
-        {
-          logger: (m) => console.log(m),
-        }
+        { logger: (m) => console.log(m) }
       );
 
       text = result.data.text;
     }
 
-    // ✍️ texte manuel
     if (req.body.text) {
       text += " " + req.body.text;
     }
@@ -108,7 +104,7 @@ app.post("/ocr", upload.single("image"), async (req, res) => {
 
 /**
  * =========================
- * 🚀 NEW : OCR BASE64 (EXPO SAFE)
+ * 🚀 OCR BASE64 (FIXÉ + STABLE)
  * =========================
  */
 app.post("/ocr-base64", async (req, res) => {
@@ -119,11 +115,13 @@ app.post("/ocr-base64", async (req, res) => {
       return res.status(400).json({ error: "No image provided" });
     }
 
-    // convert base64 -> buffer
-    const buffer = Buffer.from(image, "base64");
+    // 🔥 CREATE TEMP FILE (FIX RENDER + TESSERACT BUG)
+    const filePath = path.join(os.tmpdir(), `ocr_${Date.now()}.jpg`);
+
+    fs.writeFileSync(filePath, image, "base64");
 
     const result = await Tesseract.recognize(
-      buffer,
+      filePath,
       "eng+fra",
       {
         logger: (m) => console.log(m),
@@ -131,6 +129,8 @@ app.post("/ocr-base64", async (req, res) => {
     );
 
     const text = result.data.text;
+
+    fs.unlinkSync(filePath);
 
     const meds = extractMedications(text);
 

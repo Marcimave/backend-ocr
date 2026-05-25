@@ -1,75 +1,145 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Tesseract from "tesseract.js"; // ⚠️ MANQUANT
-import Med from "./models/Med.js";    // ⚠️ MANQUANT
+import cors from "cors";
+import Tesseract from "tesseract.js";
+import Med from "./models/Med.js";
 
 dotenv.config();
 
 const app = express();
-app.use(express.json()); // ⚠️ IMPORTANT
-
-// ✅ Connexion MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connecté"))
-  .catch((err) => console.log("❌ MongoDB error:", err));
 
 /**
- * =========================
- * 🧠 SEARCH FUNCTION
- * =========================
+ * 🌐 ROUTE TEST (OBLIGATOIRE)
  */
-async function searchMedicines(text) {
-  if (!text) return [];
+app.get("/", (req, res) => {
+  res.send("Backend OK 🚀");
+});
 
-  const lower = text.toLowerCase();
-  const meds = await Med.find();
+app.get("/test", (req, res) => {
+  res.json({ success: true });
+});
 
-  return meds.filter(med =>
-    lower.includes(med.name.toLowerCase())
-  );
+/**
+ * 🔥 MIDDLEWARES (IMPORTANT)
+ */
+app.use(cors());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+/**
+ * 🔌 MONGODB CONNECT (SAFE)
+ */
+let isMongoConnected = false;
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB connecté");
+    isMongoConnected = true;
+  })
+  .catch((err) => {
+    console.log("❌ MongoDB error:", err.message);
+  });
+
+/**
+ * 🧼 CLEAN TEXT
+ */
+function clean(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
- * =========================
- * 🚀 OCR BASE64 ROUTE
- * =========================
+ * 🔍 OCR ROUTE (ULTRA STABLE)
  */
 app.post("/ocr-base64", async (req, res) => {
   try {
-    const { image } = req.body;
+    const { image, text } = req.body;
 
-    if (!image) {
-      return res.status(400).json({ error: "No image provided" });
+    if (!image && !text) {
+      return res.status(400).json({
+        success: false,
+        error: "No image or text provided",
+      });
     }
 
-    const buffer = Buffer.from(image, "base64");
+    let rawText = "";
 
-    const result = await Tesseract.recognize(buffer, "eng+fra");
+    /**
+     * 📸 IMAGE OCR
+     */
+    if (image) {
+      try {
+        const buffer = Buffer.from(image, "base64");
 
-    const text = result.data.text;
+        const result = await Tesseract.recognize(buffer, "eng+fra");
 
-    const meds = await searchMedicines(text);
+        rawText = result.data.text || "";
+      } catch (ocrErr) {
+        console.error("❌ OCR FAIL:", ocrErr.message);
+        return res.status(500).json({
+          success: false,
+          error: "OCR failed",
+        });
+      }
+    }
 
+    /**
+     * ⌨️ TEXT DIRECT
+     */
+    if (text) {
+      rawText = text;
+    }
+
+    const cleaned = clean(rawText);
+
+    /**
+     * 💊 MED SEARCH (SAFE SI MONGO DOWN)
+     */
+    let found = [];
+
+    if (isMongoConnected) {
+      try {
+        const meds = await Med.find();
+
+        found = meds.filter((m) =>
+          cleaned.includes(m.name.toLowerCase())
+        );
+      } catch (dbErr) {
+        console.log("❌ DB ERROR:", dbErr.message);
+      }
+    }
+
+    /**
+     * ✅ RESPONSE
+     */
     res.json({
       success: true,
-      text,
-      meds,
+      text: rawText,
+      cleanedText: cleaned,
+      meds: found,
+      mongo: isMongoConnected, // debug utile
     });
 
   } catch (err) {
-    console.error("OCR ERROR:", err);
-    res.status(500).json({ error: "OCR failed" });
+    console.error("🔥 SERVER ERROR:", err.message);
+
+    res.status(500).json({
+      success: false,
+      error: "Server error",
+    });
   }
 });
 
 /**
- * =========================
- * 🚀 START SERVER (TOUT EN BAS)
- * =========================
+ * 🚀 START SERVER (RENDER SAFE)
  */
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

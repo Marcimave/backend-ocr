@@ -1,12 +1,10 @@
 import mongoose from "mongoose";
 
 const medSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  dosage: { type: String },
-  price: { type: Number },
-  pharmacies: [String]
+  name: String,
+  dosage: String,
+  price: Number,
+  pharmacies: [String],
 });
 
-const Med = mongoose.model("Med", medSchema);
-
-export default Med;
+export default mongoose.model("Med", medSchema);

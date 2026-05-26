@@ -37,17 +37,27 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 /**
  * 🔌 MONGODB CONNECT (SAFE + CLEAN LOG)
  */
+/**
+ * 🔌 MONGODB CONNECT (SAFE VERSION)
+ */
 let isMongoConnected = false;
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
+async function connectMongo() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000, // évite blocage
+    });
+
     console.log("✅ MongoDB connecté");
     isMongoConnected = true;
-  })
-  .catch((err) => {
-    console.log("❌ MongoDB error:", err.message);
-  });
+
+  } catch (err) {
+    console.log("❌ MongoDB OFF (app continue):", err.message);
+    isMongoConnected = false;
+  }
+}
+
+connectMongo();
 
 /**
  * 🧼 CLEAN TEXT
@@ -111,19 +121,19 @@ app.post("/ocr-base64", async (req, res) => {
     /**
      * 💊 MED SEARCH (SAFE MODE)
      */
-    let found = [];
+let found = [];
 
-    if (isMongoConnected) {
-      try {
-        const meds = await Med.find();
+if (isMongoConnected) {
+  try {
+    const meds = await Med.find();
 
-        found = meds.filter((m) =>
-          cleaned.includes(m.name.toLowerCase())
-        );
-      } catch (dbErr) {
-        console.log("❌ DB ERROR:", dbErr.message);
-      }
-    }
+    found = meds.filter((m) =>
+      cleaned.includes(m.name.toLowerCase())
+    );
+  } catch (err) {
+    console.log("DB ERROR:", err.message);
+  }
+}
 
     /**
      * ✅ RESPONSE FINAL

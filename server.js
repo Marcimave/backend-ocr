@@ -21,27 +21,21 @@ app.get("/test", (req, res) => {
 });
 
 /**
- * 🔥 MIDDLEWARES (IMPORTANT - Render + Expo)
+ * 🔥 MIDDLEWARES
  */
-app.use(cors({
-  origin: "*"
-}));
-
+app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 /**
- * 🔌 MONGODB CONNECT (SAFE + CLEAN LOG)
- */
-/**
- * 🔌 MONGODB CONNECT (SAFE VERSION)
+ * 🔌 MONGODB CONNECT (SAFE)
  */
 let isMongoConnected = false;
 
 async function connectMongo() {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 5000, // évite blocage
+      serverSelectionTimeoutMS: 5000,
     });
 
     console.log("✅ MongoDB connecté");
@@ -67,7 +61,16 @@ function clean(text) {
 }
 
 /**
- * 🔍 OCR ROUTE (STABLE + SAFE)
+ * 🔍 ROUTE DEBUG (GET)
+ */
+app.get("/ocr-base64", (req, res) => {
+  res.json({
+    message: "OCR endpoint actif ✔️ (utilise POST)"
+  });
+});
+
+/**
+ * 🔍 OCR ROUTE (POST)
  */
 app.post("/ocr-base64", async (req, res) => {
   try {
@@ -106,7 +109,7 @@ app.post("/ocr-base64", async (req, res) => {
     }
 
     /**
-     * ⌨️ TEXT MODE
+     * ⌨️ TEXT DIRECT
      */
     if (text) {
       rawText = text;
@@ -115,24 +118,24 @@ app.post("/ocr-base64", async (req, res) => {
     const cleaned = clean(rawText);
 
     /**
-     * 💊 MED SEARCH (SAFE MODE)
+     * 💊 MED SEARCH (SAFE)
      */
-let found = [];
+    let found = [];
 
-if (isMongoConnected) {
-  try {
-    const meds = await Med.find();
+    if (isMongoConnected) {
+      try {
+        const meds = await Med.find();
 
-    found = meds.filter((m) =>
-      cleaned.includes(m.name.toLowerCase())
-    );
-  } catch (err) {
-    console.log("DB ERROR:", err.message);
-  }
-}
+        found = meds.filter((m) =>
+          cleaned.includes(m.name.toLowerCase())
+        );
+      } catch (dbErr) {
+        console.log("❌ DB ERROR:", dbErr.message);
+      }
+    }
 
     /**
-     * ✅ RESPONSE FINAL
+     * ✅ RESPONSE
      */
     return res.json({
       success: true,
@@ -153,7 +156,7 @@ if (isMongoConnected) {
 });
 
 /**
- * 🚀 START SERVER (RENDER SAFE)
+ * 🚀 START SERVER (IMPORTANT)
  */
 const PORT = process.env.PORT || 3000;
 

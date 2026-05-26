@@ -8,9 +8,13 @@ import Med from "./models/Med.js";
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on", PORT);
+});
 
 /**
- * 🌐 ROUTE TEST (OBLIGATOIRE)
+ * 🌐 ROUTES TEST
  */
 app.get("/", (req, res) => {
   res.send("Backend OK 🚀");
@@ -21,14 +25,17 @@ app.get("/test", (req, res) => {
 });
 
 /**
- * 🔥 MIDDLEWARES (IMPORTANT)
+ * 🔥 MIDDLEWARES (IMPORTANT - Render + Expo)
  */
-app.use(cors());
+app.use(cors({
+  origin: "*"
+}));
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 /**
- * 🔌 MONGODB CONNECT (SAFE)
+ * 🔌 MONGODB CONNECT (SAFE + CLEAN LOG)
  */
 let isMongoConnected = false;
 
@@ -54,7 +61,7 @@ function clean(text) {
 }
 
 /**
- * 🔍 OCR ROUTE (ULTRA STABLE)
+ * 🔍 OCR ROUTE (STABLE + SAFE)
  */
 app.post("/ocr-base64", async (req, res) => {
   try {
@@ -76,11 +83,15 @@ app.post("/ocr-base64", async (req, res) => {
       try {
         const buffer = Buffer.from(image, "base64");
 
-        const result = await Tesseract.recognize(buffer, "eng+fra");
+        const result = await Tesseract.recognize(
+          buffer,
+          "eng+fra"
+        );
 
         rawText = result.data.text || "";
       } catch (ocrErr) {
-        console.error("❌ OCR FAIL:", ocrErr.message);
+        console.log("❌ OCR FAIL:", ocrErr.message);
+
         return res.status(500).json({
           success: false,
           error: "OCR failed",
@@ -89,7 +100,7 @@ app.post("/ocr-base64", async (req, res) => {
     }
 
     /**
-     * ⌨️ TEXT DIRECT
+     * ⌨️ TEXT MODE
      */
     if (text) {
       rawText = text;
@@ -98,7 +109,7 @@ app.post("/ocr-base64", async (req, res) => {
     const cleaned = clean(rawText);
 
     /**
-     * 💊 MED SEARCH (SAFE SI MONGO DOWN)
+     * 💊 MED SEARCH (SAFE MODE)
      */
     let found = [];
 
@@ -115,22 +126,22 @@ app.post("/ocr-base64", async (req, res) => {
     }
 
     /**
-     * ✅ RESPONSE
+     * ✅ RESPONSE FINAL
      */
-    res.json({
+    return res.json({
       success: true,
       text: rawText,
       cleanedText: cleaned,
       meds: found,
-      mongo: isMongoConnected, // debug utile
+      mongo: isMongoConnected
     });
 
   } catch (err) {
-    console.error("🔥 SERVER ERROR:", err.message);
+    console.log("🔥 SERVER ERROR:", err.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: "Server error",
+      error: "Server error"
     });
   }
 });
